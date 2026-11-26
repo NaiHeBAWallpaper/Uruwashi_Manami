@@ -10,6 +10,8 @@ let loadingResolution;
 let spineData;
 
 let customScale = 0.8;
+let positionX = 0;
+let positionY = 0;
 let targetFps = 60;
 let bgmfile = './assets/audio/Theme_350.ogg';
 let bgmvolume = 0.2;
@@ -39,7 +41,17 @@ const MAX_RENDER_SCALE = 2;
 const MAX_RENDER_PIXELS = 5120 * 2880;
 
 let currentTracks = []; // 跟踪当前播放的音频
-window.selectedLanguage = 'Japanese'; // 全局语言变量（挂载到window对象）
+let interfaceLanguage = 'default';
+let steamLanguage = '';
+let subtitleLanguagePreference = 'auto';
+window.selectedLanguage = 'English';
+const subtitleLocales = {
+	English: 'en',
+	Chinese: 'zh-Hans',
+	TraditionalChinese: 'zh-Hant',
+	Japanese: 'ja',
+	Korean: 'ko'
+};
 let isVoicelinePlaying = false;
 
 const CHARACTER = 'CH0339';
@@ -61,6 +73,14 @@ const AUDIO_DETAIL = [
 			"Chinese": [
 				"我们狂猎艺术学院是一所历史悠久的学园。",
 				"历代优秀评议会长的事迹，至今仍被传颂。"
+			],
+			TraditionalChinese: [
+				"我們狂獵藝術學院是一所歷史悠久的學園。",
+				"歷代優秀評議會長的事蹟，至今仍被傳頌。"
+			],
+			Korean: [
+				"저희 와일드헌트 예술학원은 오랜 역사를 지닌 학교입니다.",
+				"역대 뛰어난 평의회장들의 업적은 지금도 전해지고 있지요."
 			]
 		}
 	},
@@ -80,6 +100,16 @@ const AUDIO_DETAIL = [
 				"不过，我的名字大概不会位列其中。",
 				"虽说事出有因，我却连本专业的活动都没能开展——",
 				"学院的管理方式，也被人评价为独裁。"
+			],
+			TraditionalChinese: [
+				"不過，我的名字大概不會位列其中。",
+				"雖說事出有因，我卻連本專業的活動都沒能開展——",
+				"學院的管理方式，也被人評價為獨裁。"
+			],
+			Korean: [
+				"하지만 제 이름은 그들 사이에 오르지 못하겠지요.",
+				"사정이 있다곤 해도 전공 분야의 활동조차 하지 못하고 있고—",
+				"학원 운영도 독재적이라는 평가를 받고 있으니까요."
 			]
 		}
 	},
@@ -99,6 +129,16 @@ const AUDIO_DETAIL = [
 				"我并不觉得这种评价有失公允。",
 				"艺术是能够跨越时间的。",
 				"我竭力守护的艺术，终将传承给后世吧。"
+			],
+			TraditionalChinese: [
+				"我並不覺得這種評價有失公允。",
+				"藝術是能夠跨越時間的。",
+				"我竭力守護的藝術，終將傳承給後世吧。"
+			],
+			Korean: [
+				"그 평가가 부당하다고 생각하지는 않습니다.",
+				"예술이란 시간을 초월하는 것.",
+				"제가 지켜 낸 예술은 후세에 이어지겠지요."
 			]
 		}
 	},
@@ -121,6 +161,18 @@ const AUDIO_DETAIL = [
 				"这就是我继续担任评议会长的理由。",
 				"所以，老师——今后也……",
 				"您会继续守望这样的我，对吧？"
+			],
+			TraditionalChinese: [
+				"守護這所學院，以及學院的藝術——",
+				"這就是我繼續擔任評議會長的理由。",
+				"所以，老師——今後也……",
+				"您會繼續守望這樣的我，對吧？"
+			],
+			Korean: [
+				"이 학원과 학원의 예술을 지키는 것—",
+				"그것이 제가 평의회장을 계속 맡는 이유입니다.",
+				"그러니 선생님, 앞으로도……",
+				"이런 저를 지켜봐 주실 거죠?"
 			]
 		}
 	}
@@ -337,7 +389,8 @@ function drawHitboxes() {
 		n = (n / transpose) - (d[side].length / (transpose * 2));
 		n = n * customScale + (d[side].length / (transpose * 2));
 		n = (d[side].length / (transpose * 2)) - n;
-		return d[side].mid - n;
+		const offset = side === 'x' ? canvas.width * positionX : canvas.height * positionY;
+		return d[side].mid - n + offset;
 	}
 
 	for (const key in HITBOX) {
@@ -427,12 +480,44 @@ function setMouse(event) {
 		ax = canvas.width - ax;
 	}
 
-	return { x: ax, y: ay }
+	return { x: ax - canvas.width * positionX, y: ay - canvas.height * positionY };
+}
+
+function updateSubtitleLanguage() {
+	let language = subtitleLanguagePreference;
+	if (language === 'auto') {
+		const locale = interfaceLanguage === 'default' ? steamLanguage : interfaceLanguage;
+		const [primary, region] = locale.split(/[-_]/);
+		if (primary === 'tchinese' || (primary === 'zh' && ['cht', 'hant', 'tw', 'hk', 'mo'].includes(region))) {
+			language = 'TraditionalChinese';
+		} else if (primary === 'schinese' || primary === 'zh') {
+			language = 'Chinese';
+		} else if (primary === 'ja' || primary === 'japanese') {
+			language = 'Japanese';
+		} else if (primary === 'ko' || primary === 'korean' || primary === 'koreana') {
+			language = 'Korean';
+		} else {
+			language = 'English';
+		}
+	}
+
+	if (language === window.selectedLanguage) return;
+	window.selectedLanguage = language;
+	textbox.lang = subtitleLocales[language];
+	showVoicelineSubtitle(currentTracks.at(-1));
 }
 
 function init() {
 	// Wallpaper Engine settings
 	window.wallpaperPropertyListener = {
+		applyGeneralProperties: (props) => {
+			const language = props.language?.value ?? props.language;
+			const steamLocale = props.steamlanguage?.value ?? props.steamlanguage;
+			if (typeof language !== 'string' && typeof steamLocale !== 'string') return;
+			if (typeof language === 'string') interfaceLanguage = language.toLowerCase();
+			if (typeof steamLocale === 'string') steamLanguage = steamLocale.toLowerCase();
+			updateSubtitleLanguage();
+		},
 		applyUserProperties: (props) => {
 			if (props.schemecolor) {
 				bufferColor = props.schemecolor.value.split(" ");
@@ -441,8 +526,16 @@ function init() {
 			if (props.scale) {
 				customScale = props.scale.value;
 				document.documentElement.style.setProperty('--wallpaper-scale', customScale);
-				resize();
 			}
+			if (props.positionx) {
+				positionX = props.positionx.value / 100;
+				document.documentElement.style.setProperty('--wallpaper-position-x', props.positionx.value + 'vw');
+			}
+			if (props.positiony) {
+				positionY = props.positiony.value / 100;
+				document.documentElement.style.setProperty('--wallpaper-position-y', props.positiony.value + 'vh');
+			}
+			if (props.scale || props.positionx || props.positiony) resize();
 			if (props.targetfps) targetFps = props.targetfps.value;
 
 			if (props.introanimation) introAnimation = props.introanimation.value;
@@ -492,12 +585,17 @@ function init() {
 
 			// 监听模型分辨率设置
 			if (props.modelresolution) modelResolution = props.modelresolution.value;
-			if (assetManager && typeof introAnimation !== 'undefined' && !modelFrame && loadingResolution !== modelResolution) {
+			if (assetManager && typeof introAnimation !== 'undefined' && !modelFrame &&
+				(props.modelresolution || loadingResolution !== modelResolution)) {
 				reloadModel();
 			}
 
-			if (props.dialoglanguage) window.selectedLanguage = props.dialoglanguage.value;
-			if (props.dialoglanguage || props.showdialog) {
+			if (props.dialoglanguage) {
+				const language = props.dialoglanguage.value;
+				subtitleLanguagePreference = Object.hasOwn(subtitleLocales, language) ? language : 'auto';
+				updateSubtitleLanguage();
+			}
+			if (props.showdialog) {
 				showVoicelineSubtitle(currentTracks.at(-1));
 			}
 
@@ -521,6 +619,7 @@ function init() {
 	};
 
 	textbox = document.getElementById('textbox');
+	textbox.lang = subtitleLocales[window.selectedLanguage];
 
 	canvas = document.getElementById('canvas');
 	canvas.addEventListener('mouseleave', releaseMouseOnExit);
@@ -824,7 +923,7 @@ function resize() {
 		transpose = 1600 / canvas.height;
 	}
 
-	mvp.ortho2d(centerX - width / 2, centerY - height / 2, width, height);
+	mvp.ortho2d(centerX - width / 2 - positionX * width, centerY - height / 2 + positionY * height, width, height);
 	gl.viewport(0, 0, canvas.width, canvas.height);
 }
 
