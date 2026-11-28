@@ -50,14 +50,15 @@ const subtitleLocales = {
 	Chinese: 'zh-Hans',
 	TraditionalChinese: 'zh-Hant',
 	Japanese: 'ja',
-	Korean: 'ko'
+	Korean: 'ko',
+	Thai: 'th'
 };
 let isVoicelinePlaying = false;
 
 const CHARACTER = 'CH0339';
 let modelResolution = '8k';
 
-// Japanese transcription: https://bluearchive.wiki/wiki/Manami/audio (CC BY-SA 4.0).
+// Japanese memorial lobby transcription: Kivo Wiki, via StuArchive (https://raw.githubusercontent.com/QuetzalSidera/StuArchive/main/data/students/555.json).
 // English and Simplified Chinese are translations of the Japanese transcription.
 const AUDIO_DETAIL = [
 	{
@@ -81,7 +82,8 @@ const AUDIO_DETAIL = [
 			Korean: [
 				"저희 와일드헌트 예술학원은 오랜 역사를 지닌 학교입니다.",
 				"역대 뛰어난 평의회장들의 업적은 지금도 전해지고 있지요."
-			]
+			],
+			Thai: ["สถาบันศิลปะไวลด์ฮันต์ของเราเป็นโรงเรียนที่มีประวัติยาวนานค่ะ","ผลงานอันยิ่งใหญ่ของประธานสภาผู้มากความสามารถในแต่ละรุ่น ยังได้รับการเล่าขานมาจนถึงทุกวันนี้"]
 		}
 	},
 	{
@@ -110,7 +112,8 @@ const AUDIO_DETAIL = [
 				"하지만 제 이름은 그들 사이에 오르지 못하겠지요.",
 				"사정이 있다곤 해도 전공 분야의 활동조차 하지 못하고 있고—",
 				"학원 운영도 독재적이라는 평가를 받고 있으니까요."
-			]
+			],
+			Thai: ["แต่ชื่อของฉันคงไม่ได้ไปอยู่เคียงข้างพวกเขาหรอกค่ะ","ถึงจะมีเหตุผลอยู่ แต่ฉันยังไม่ได้ทำงานในสาขาที่ตัวเองเรียนเลยด้วยซ้ำ—","แถมวิธีบริหารสถาบันของฉันก็ยังถูกมองว่าเป็นเผด็จการค่ะ"]
 		}
 	},
 	{
@@ -139,7 +142,8 @@ const AUDIO_DETAIL = [
 				"그 평가가 부당하다고 생각하지는 않습니다.",
 				"예술이란 시간을 초월하는 것.",
 				"제가 지켜 낸 예술은 후세에 이어지겠지요."
-			]
+			],
+			Thai: ["ฉันไม่คิดว่าคำวิจารณ์นั้นไม่ยุติธรรมหรอกค่ะ","ศิลปะเป็นสิ่งที่อยู่เหนือกาลเวลา","ศิลปะที่ฉันปกป้องเอาไว้ จะถูกส่งต่อไปถึงคนรุ่นหลังค่ะ"]
 		}
 	},
 	{
@@ -173,7 +177,8 @@ const AUDIO_DETAIL = [
 				"그것이 제가 평의회장을 계속 맡는 이유입니다.",
 				"그러니 선생님, 앞으로도……",
 				"이런 저를 지켜봐 주실 거죠?"
-			]
+			],
+			Thai: ["การปกป้องสถาบันแห่งนี้และศิลปะของสถาบัน—","นั่นคือเหตุผลที่ฉันยังคงทำหน้าที่ประธานสภาต่อไปค่ะ","เพราะฉะนั้น คุณครูคะ—จากนี้ไปก็...","ช่วยเฝ้ามองฉันคนนี้ต่อไปด้วยนะคะ?"]
 		}
 	}
 ];
@@ -272,7 +277,7 @@ function releaseMouseOnExit() {
 }
 
 function showVoicelineSubtitle(clip) {
-	const text = clip?.dialog[window.selectedLanguage]?.[clip.index] ?? "";
+	const text = getSubtitleText(clip?.dialog, window.selectedLanguage, clip?.index);
 	textbox.textContent = text;
 	textbox.style.opacity = dialogBox && text ? 1 : 0;
 }
@@ -483,6 +488,16 @@ function setMouse(event) {
 	return { x: ax - canvas.width * positionX, y: ay - canvas.height * positionY };
 }
 
+function getSubtitleText(dialog, language, index) {
+	let text = dialog?.[language]?.[index];
+	if (text == null && language === 'Thai') {
+		language = 'English';
+		text = dialog?.[language]?.[index];
+	}
+	textbox.lang = subtitleLocales[language];
+	return text ?? "";
+}
+
 function updateSubtitleLanguage() {
 	let language = subtitleLanguagePreference;
 	if (language === 'auto') {
@@ -496,6 +511,8 @@ function updateSubtitleLanguage() {
 			language = 'Japanese';
 		} else if (primary === 'ko' || primary === 'korean' || primary === 'koreana') {
 			language = 'Korean';
+		} else if (primary === 'th' || primary === 'thai') {
+			language = 'Thai';
 		} else {
 			language = 'English';
 		}
